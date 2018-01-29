@@ -1,0 +1,211 @@
+
+
+#explorar el conjunto de datos
+summary(psu16)
+library(ggplot2)
+
+      
+      
+
+#graficar el conjunto de datos con ggplot2
+
+library(ggplot2)
+library(plotly)
+
+plot1 <- ggplot(psu16, aes(x = Promedio_PSU, y = Promedio_NEM, color = Administracion)) + 
+  geom_point()+
+  labs(color = "Administración") +
+  labs(x = "Promedio PSU")+
+  labs(y = "Promedio NEM")
+  
+plot1 <- ggplotly(plot1)
+
+
+#desplegar el gráfico 
+plot1
+
+#crear la fórmula para el modelo de regresión
+fmla <- Promedio_PSU ~ Promedio_NEM + Administracion
+
+#explorar la fórmula
+fmla
+
+
+#crear el model utilizando el conjunto de datos
+psu_model <- lm(fmla, data = psu16)
+
+#explorar el modelo utilizando diversos métodos
+psu_model
+summary(psu_model)
+
+#primer método: utilizar el paquete broom
+library(broom)
+
+#aplicar la función glance de broom
+glance(psu_model)
+
+#segundo método: utilizar el paquete sigr
+library(sigr)
+
+#aplicar la función wrapFTest
+wrapFTest(psu_model)
+
+
+#crear un caso hipotético para comprobar el modelo. Examinar este nuevo caso 
+newnem
+
+#crear el predictor para el conjunto de datos completo
+psu16$prediction <-  predict(psu_model)
+
+#graficar la predicción del puntaje promedio de la PSU
+plot2 <- ggplot(psu16, aes(x = prediction, y = Promedio_PSU, color = Administracion, hover = Promedio_NEM)) + 
+  geom_point() +
+  geom_abline(color = "red")+
+  labs(x = "Predicción PSU")+
+  labs(y = "PSU 2016")
+  
+plot2 <- ggplotly(plot2)
+
+plot2
+
+
+#desplegar el gráfico
+plot2
+
+#crear el predictor para el caso hipotetico
+pred <- predict(psu_model, newdata = newnem)
+
+#explorar el predictor
+pred
+
+#crear una variable para desplegar los residuales
+psu16$residuals <- psu16$Promedio_PSU - psu16$prediction
+
+#crear un gráfico para comparar los residuales con el modelo de regresion
+plot3 <- ggplot(psu16, aes(x = prediction, y = residuals)) + 
+  geom_pointrange(aes(ymin = 0, ymax = residuals)) + 
+  geom_hline(yintercept = 0, linetype = 3) + 
+  ggtitle("residuals vs. linear model prediction")
+
+
+plot3 <- ggplotly(plot3)
+
+plot3
+
+#graficar la comparación con el paquete WVPlots y la función GainCurvePlot
+library(WVPlots)
+plot4 <- GainCurvePlot(psu16, "prediction", "Promedio_PSU", "Modelo PSU")
+
+
+#Calcular los residuales para evaluar el modelo
+res <- psu16$residuals
+
+#calcular los valores de RMSE R cuadrado y Rho
+(rmse <- sqrt(mean(res^2)))
+
+(sd_psu16 <- sd(psu16$Promedio_PSU))
+
+(psu_mean <- mean(psu16$Promedio_PSU))
+
+(tss <- sum( (psu16$Promedio_PSU - psu_mean)^2 ))
+
+(rss <- sum(psu16$residuals^2))
+
+(rsq <- 1 - (rss/tss))
+
+(rsq_glance <- glance(psu_model)$r.squared)
+
+(rho <- cor(psu16$prediction, psu16$Promedio_PSU))
+
+(rho2 <- rho ^ 2)
+
+(rsq_glance <- glance(psu_model)$r.squared)
+
+(N <- nrow(psu16))
+
+# calcular los valores de las filas para crear un set de datos para entrenar 
+(target <- round(N * 0.75))
+
+# Crear un vector de variables aleatorias uniformes para crear los datos entrenados y los datos de prubea(75% y 25% respectivamente)
+gp <- runif(N)
+
+psu_train <- psu16[gp < 0.75, ]
+psu_test <- psu16[gp >= 0.75, ]
+
+# examinar ambos conjuntos de datos con nrow() 
+
+nrow(psu_train)
+nrow(psu_test)
+summary(psu_train)
+
+
+#crear un modelo lineal para los datos entrenados
+psu_model_t <- lm(fmla, data = psu_train)
+
+#inspeccionar el modelo
+summary(psu_model_t)
+
+#crear el predictor para el modelo entrenado
+psu_train$pred <- predict(psu_model_t)
+
+# predecir el puntaje promedio de la PSU a partir del promedio NEM y del tipo de Administración (datos de prueba)
+psu_test$pred <- predict(psu_model_t, newdata = psu_test)
+
+library(tsensembler)
+
+# evaluar el RSME en el conjunto de datos entrenados y en el conjunto de datos de prueba
+(rmse_train <- rmse(psu_train$pred, psu_train$Promedio_PSU))
+(rmse_test <- rmse(psu_test$pred, psu_test$Promedio_PSU))
+
+
+# Evaluar el valor de R cuadraro para ambos conjuntos de datos
+(rsq_train <- r_squared(psu_train$pred, psu_train$Promedio_PSU))
+(rsq_test <- r_squared(psu_test$pred, psu_test$Promedio_PSU))
+
+# graficar la predicción con el valor real del promedio de la PSU en conjunto de datos de prueba
+plot5 <- ggplot(psu_test, aes(x = pred, y = Promedio_PSU, color = Administracion, hover = Promedio_NEM)) + 
+  geom_point() + 
+  geom_abline(color = "red")+
+  labs(x = "Predicción Promedio PSU")+
+  labs(y = "Promedio PSU 2016")
+  
+
+
+plot5 <- ggplotly(plot5)
+
+plot5
+
+
+
+
+
+
+
+# obtener el número de filas para implementar una validación cruzada en 3 pasos
+library(vtreat)
+nRows <- nrow(psu16)
+
+#crear el plan de separación de los datos
+splitPlan <- kWayCrossValidation(nRows, 3, NULL, NULL)
+
+# Examinar el plan
+str(splitPlan)
+
+
+k <- 3 
+psu16$pred.cv <- 0 
+for(i in 1:k) {
+  split <- splitPlan[[i]]
+  model <- lm(fmla, data = psu16[split$train, ])
+  psu16$pred.cv[split$app] <- predict(model, newdata = psu16[split$app, ])
+}
+
+# crear un predictor del modelo completo
+psu16$pred <- predict(lm(fmla, data = psu16))
+
+# calcular el RMSE de las predicciones del modelo completo
+library(Metrics)
+rmse(psu16$pred, psu16$Promedio_PSU)
+
+# calcular el RMSE de las predicciones de la validacion cruzada
+rmse(psu16$pred.cv, psu16$Promedio_PSU)
